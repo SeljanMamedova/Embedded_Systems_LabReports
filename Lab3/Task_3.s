@@ -3,10 +3,10 @@
 
 uRTCLib rtc(0x68);       // Create RTC object at I2C address 0x68 (fixed for DS1307)
 
-// Digit control pins (D1 D2 D3 D4) -> which 7-seg digit is ON
+// Digit control pins (D1 D2 D3 D4) which 7-seg digit is ON
 int digitPins[4] = {5, 4, 3, 2};
 
-// Segment pins: A B C D E F G DP(decimal point) -> which LED segment is ON
+// Segment pins: A B C D E F G DP(decimal point) which LED segment is ON
 int segmentPins[8] = {8, 9, 10, 11, 12, 6, 7, 1};
 
 // Segment patterns for numbers 0–9 (1=segment ON, 0=segment OFF)
@@ -36,7 +36,7 @@ bool gameStarted = false; // Before first press, game is idle (no counting)
 
 // Function returns true ONLY once per real button press (debounced + edge-detected)
 bool buttonPressedEvent() {
-  static bool last = HIGH;               // Previous stable button state (INPUT_PULLUP -> idle is HIGH)
+  static bool last = HIGH;               // Previous stable button state (INPUT_PULLUP - idle is HIGH)
   static unsigned long tLastChange = 0;  // Time when the signal last changed (for debouncing)
   static bool armed = true;              // Allows 1 event per press (prevents repeat while held)
 
@@ -86,7 +86,7 @@ void setup() {
 
 void loop() {
 
-  bool pressed = buttonPressedEvent();   // detect press ONCE (debounced event)
+  bool pressed = buttonPressedEvent();   // detect press ONCE 
 
   if (!gameStarted) {
     counter = 0;                         // keep display at 0
@@ -100,13 +100,13 @@ void loop() {
       lastSecond = rtc.second();         // store current second to avoid instant increment
     }
 
-    displayTwoDigits(counter);           // keep refreshing the 7-seg display (multiplexing)
-    return;                              // exit loop early (do nothing else until started)
+    displayTwoDigits(counter);           // keep refreshing the 7-seg display 
+    return;                              // exit loop early 
   }
 
   // Refresh RTC data each loop
   rtc.refresh();
-  byte currentSecond = rtc.second();     // current RTC second (0..59)
+  byte currentSecond = rtc.second();     // current RTC second 
 
   // If button pressed during game: toggle pause state
   if (pressed) {
@@ -114,7 +114,7 @@ void loop() {
     lastSecond = currentSecond;          // resync seconds so it doesn't immediately increment
   }
 
-  // If not paused and second changed -> one second passed -> increment counter
+  // If not paused and second changed - one second passed - increment counter
   if (!paused && currentSecond != lastSecond) {
     lastSecond = currentSecond;          // update last second
     counter++;                           // increment counter each second
@@ -123,10 +123,10 @@ void loop() {
 
   if (pressed) {
 
-    Serial.print("Button pressed! Counter = "); // print message to Serial Monitor
-    Serial.println(counter);                     // print current counter value
+    Serial.print("Button pressed! Counter = ");        // print message to Serial Monitor
+    Serial.println(counter);                          // print current counter value
 
-    // If counter is exactly 10 -> success (green ON), else fail (red ON)
+    // If counter is exactly 10 then success (green ON), else fail (red ON)
     if (counter == 10) {
       digitalWrite(greenLedPin, HIGH); // success
       digitalWrite(redLed, LOW);
@@ -146,10 +146,10 @@ void loop() {
   displayTwoDigits(counter);           // continuously refresh display
 }
 
-// Show one digit on selected 7-segment (multiplexing step)
+// Show one digit on selected 7-segment 
+
 void showDigit(int value, int digitIndex) {
 
-  // Turn OFF all digits first so only one digit is active at a time
   for (int i = 0; i < 4; i++)
     digitalWrite(digitPins[i], LOW);
 
@@ -157,19 +157,20 @@ void showDigit(int value, int digitIndex) {
   for (int i = 0; i < 8; i++)
     digitalWrite(segmentPins[i], numbers[value][i]);
 
-  // Enable the chosen digit (2 or 3 in your usage)
   digitalWrite(digitPins[digitIndex], HIGH);
 
-  delay(5); // short delay so the digit stays visible before switching to next digit
+  delay(5);                   // short delay so the digit stays visible before switching to next digit
 }
 
 // Display number only on 3rd & 4th digits (digitIndex 2 and 3)
+
 void displayTwoDigits(int num) {
   int tens = num / 10; // tens digit
   int ones = num % 10; // ones digit
 
   // Only show tens if it's not zero (so "05" becomes "5")
-  if (tens > 0) showDigit(tens, 2); // show tens on 3rd digit (index 2)
 
-  showDigit(ones, 3);               // show ones on 4th digit (index 3)
+  if (tens > 0) showDigit(tens, 2);      // show tens on 3rd digit (index 2)
+
+  showDigit(ones, 3);                   // show ones on 4th digit (index 3)
 }
