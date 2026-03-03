@@ -1,109 +1,98 @@
-# ===================== IMPORTS =====================
 
-import sys                    # Gives access to system-specific parameters (sys.argv, sys.exit)
-import time                   # Used for time measurement and delays
-import serial                 # pyserial library for serial communication with Arduino
-import serial.tools.list_ports  # Used to automatically detect available COM ports
+import sys                                             # Gives access to system-specific parameters (sys.argv, sys.exit)
+import time                                            # Used for time measurement and delays
+import serial                                          # pyserial library for serial communication with Arduino
+import serial.tools.list_ports                         # Used to automatically detect available COM ports
 
-# PyQt6 modules for GUI
-from PyQt6.QtCore import QTimer  # Timer used to repeatedly call a function
+                                                       # PyQt6 modules for GUI
+from PyQt6.QtCore import QTimer                        # Timer used to repeatedly call a function
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFrame, QProgressBar
 )
 
-# ===================== CONFIGURATION =====================
 
-BAUD = 9600  # Serial communication speed (must match Arduino Serial.begin)
+BAUD = 9600                                             # Serial communication speed (must match Arduino Serial.begin)
 
-# =========================================================
-
-
-# ===================== AUTO DETECT ARDUINO PORT =====================
 def auto_detect_port():
-    ports = list(serial.tools.list_ports.comports())  # Get list of all COM ports
+    ports = list(serial.tools.list_ports.comports())                    # Get list of all COM ports
 
-    for p in ports:  # Loop through each detected port
-        # Check if the port description contains Arduino or CH340 (Arduino clone chip)
+    for p in ports:                                                     # Loop through each detected port
+                                                                        # Check if the port description contains Arduino or CH340 (Arduino clone chip)
         if "Arduino" in p.description or "CH340" in p.description:
-            print(f"Auto-detected Arduino on {p.device}")  # Print detected port
+            print(f"Auto-detected Arduino on {p.device}")               # Print detected port
             return p.device  # Return port name (example: COM7)
 
-    print("No Arduino found!")  # If nothing found
-    return None  # Return None if no Arduino detected
+    print("No Arduino found!")                                         # If nothing found
+    return None                                                        # Return None if no Arduino detected
 
 
-# ===================== PARSE DATA FROM ARDUINO =====================
 def parse_arduino_line(line: str):
     """
     Expected Arduino format:
     X=2.53,Y=2.49,DIR=UP
     """
 
-    line = line.strip()  # Remove spaces and newline characters
+    line = line.strip()                                                   # Remove spaces and newline characters
 
-    # Ignore empty lines or system/debug messages
+                                                                          # Ignore empty lines or system/debug messages
     if not line or line.startswith("SYSTEM") or line.startswith("STATE"):
         return None
 
     try:
-        parts = line.split(",")  # Split by comma
+        parts = line.split(",")               # Split by comma
 
-        # Ensure correct format (must have exactly 3 parts)
+                                              # Ensure correct format (must have exactly 3 parts)
         if len(parts) != 3:
             return None
 
-        # Extract numeric X value
+                                              # Extract numeric X value
         x_v = float(parts[0].split("=", 1)[1])
 
-        # Extract numeric Y value
+                                              # Extract numeric Y value
         y_v = float(parts[1].split("=", 1)[1])
 
-        # Extract direction string and convert to uppercase
+                                              # Extract direction string and convert to uppercase
         direction = parts[2].split("=", 1)[1].strip().upper()
 
-        return x_v, y_v, direction  # Return tuple
+        return x_v, y_v, direction            # Return tuple
 
     except Exception:
-        return None  # If parsing fails, ignore line
+        return None                           # If parsing fails, ignore line
 
 
-# ===================== MAIN GUI CLASS =====================
 class Lab4JoystickGUI(QWidget):
 
     def __init__(self):
-        super().__init__()  # Initialize parent QWidget
+        super().__init__()                    # Initialize parent QWidget
 
         self.setWindowTitle("Lab 4 — Joystick Monitor")  # Window title
 
-        # Serial and state variables
+                                               # Serial and state variables
         self.ser = None
         self.port = None
         self.is_running = False
-        self.last_time = None  # Used to calculate Hz
+        self.last_time = None                  # Used to calculate Hz
 
-        # ===================== MAIN LAYOUT =====================
-        main = QVBoxLayout()  # Main vertical layout
+        main = QVBoxLayout()                   # Main vertical layout
 
-        # ===================== START / STOP BUTTONS =====================
-        row1 = QHBoxLayout()  # Horizontal layout for buttons
+        row1 = QHBoxLayout()                   # Horizontal layout for buttons
 
         self.start_btn = QPushButton("Start")
         self.stop_btn = QPushButton("Stop")
 
-        self.stop_btn.setEnabled(False)  # Stop disabled initially
+        self.stop_btn.setEnabled(False)         # Stop disabled initially
 
         row1.addWidget(self.start_btn)
         row1.addWidget(self.stop_btn)
-        row1.addStretch(1)  # Push buttons to left
+        row1.addStretch(1)                     # Push buttons to left
 
         main.addLayout(row1)
 
-        # ===================== PROGRESS BARS =====================
-        center = QHBoxLayout()  # Main center area
+        center = QHBoxLayout()                   # Main center area
 
         data_frame = QFrame()
-        data_frame.setFrameShape(QFrame.Shape.Box)  # Add border box
+        data_frame.setFrameShape(QFrame.Shape.Box)     # Add border box
 
         data_layout = QVBoxLayout()
 
@@ -125,8 +114,7 @@ class Lab4JoystickGUI(QWidget):
 
         data_frame.setLayout(data_layout)
         center.addWidget(data_frame)
-
-        # ===================== DIRECTION CROSS =====================
+ 
         cross = QVBoxLayout()
 
         self.up = self.block()  # Create square block
@@ -150,7 +138,6 @@ class Lab4JoystickGUI(QWidget):
         center.addLayout(cross)
         main.addLayout(center)
 
-        # ===================== BOTTOM LABELS =====================
         bottom = QHBoxLayout()
 
         self.x_label = QLabel("X: -")
@@ -167,23 +154,19 @@ class Lab4JoystickGUI(QWidget):
 
         self.setLayout(main)  # Apply layout to window
 
-        # ===================== BUTTON CONNECTIONS =====================
         self.start_btn.clicked.connect(self.start_test)
         self.stop_btn.clicked.connect(self.stop_test)
 
-        # ===================== TIMER =====================
         self.timer = QTimer()
         self.timer.timeout.connect(self.tick)  # Call tick() every interval
         self.timer.start(20)  # 20 ms (~50 Hz)
 
-    # ===================== CREATE BLOCK FOR DIRECTION =====================
     def block(self):
         f = QFrame()
         f.setFrameShape(QFrame.Shape.Box)
         f.setMinimumSize(40, 40)  # Square size
         return f
-
-    # ===================== HIGHLIGHT DIRECTION =====================
+        
     def highlight(self, direction):
 
         off = ""  # Default style
@@ -210,7 +193,6 @@ class Lab4JoystickGUI(QWidget):
 
         self.dir_label.setText(f"Dir: {direction}")
 
-    # ===================== OPEN SERIAL AND SEND START =====================
     def open_serial_and_start(self):
 
         self.port = auto_detect_port()  # Detect Arduino port
@@ -239,7 +221,6 @@ class Lab4JoystickGUI(QWidget):
             print("Failed to send START:", e)
             return False
 
-    # ===================== CLOSE SERIAL =====================
     def close_serial(self):
 
         if self.ser and self.ser.is_open:
@@ -251,7 +232,6 @@ class Lab4JoystickGUI(QWidget):
 
         self.ser = None
 
-    # ===================== START BUTTON =====================
     def start_test(self):
 
         if not (self.ser and self.ser.is_open):
@@ -263,7 +243,6 @@ class Lab4JoystickGUI(QWidget):
         self.stop_btn.setEnabled(True)
         self.last_time = None
 
-    # ===================== STOP BUTTON =====================
     def stop_test(self):
 
         self.is_running = False
@@ -271,7 +250,6 @@ class Lab4JoystickGUI(QWidget):
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
 
-    # ===================== MAIN LOOP (CALLED BY TIMER) =====================
     def tick(self):
 
         if not self.is_running or not self.ser:
@@ -304,7 +282,6 @@ class Lab4JoystickGUI(QWidget):
                 self.rate_label.setText(f"Hz: {hz:.1f}")
             self.last_time = now
 
-    # ===================== UPDATE GUI VALUES =====================
     def update_ui(self, x_v, y_v, direction):
 
         self.x_label.setText(f"X: {x_v:.2f} V")
@@ -316,13 +293,11 @@ class Lab4JoystickGUI(QWidget):
 
         self.highlight(direction)
 
-    # ===================== WINDOW CLOSE EVENT =====================
     def closeEvent(self, e):
         self.stop_test()
         super().closeEvent(e)
 
 
-# ===================== RUN APPLICATION =====================
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)  # Create Qt application
